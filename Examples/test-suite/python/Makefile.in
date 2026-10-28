@@ -152,19 +152,20 @@ VALGRIND_OPT += --suppressions=pythonswig.supp
 SWIGOPT += -Werror
 
 # Custom tests - tests with additional commandline options
-# -builtin does not support the stable ABI (abi3t or otherwise), so drop it from the
-# globally-configured SWIG_FEATURES/SWIGOPT (e.g. the CI "-builtin" job) for this test.
-python_abi3t.cpptest: override SWIG_FEATURES := $(filter-out -builtin,$(SWIG_FEATURES))
-python_abi3t.cpptest: override SWIGOPT := $(filter-out -builtin,$(SWIGOPT)) -abi3t
-# Actually compile against the limited API (opaque PyObject etc.), rather than
-# relying on PY_ABI_VER, so the test exercises the same restrictions a real
-# -abi3t build is compiled under, regardless of the configured interpreter.
-python_abi3t.cpptest: INCLUDES += -DPy_LIMITED_API=0x030f0000
+# -abi3t rejects -builtin and -O/-fastproxy, and python_abi3t checks that -abi3t
+# alone leaves the GIL enabled, so drop those options from the globally-configured
+# SWIG_FEATURES/SWIGOPT (e.g. the CI "-builtin -O" and "-nogil" jobs) for these tests.
+# They are compiled for the real abi3t target (Py_TARGET_ABI3T, .abi3t suffix) via
+# PY_ABI3T rather than PY_ABI_VER, regardless of the configured interpreter, so the
+# one binary must load under both GIL-enabled and free-threaded Python 3.15.
+python_abi3t.cpptest: override SWIG_FEATURES := $(filter-out -builtin -O -fastproxy -nogil,$(SWIG_FEATURES))
+python_abi3t.cpptest: override SWIGOPT := $(filter-out -builtin -O -fastproxy -nogil,$(SWIGOPT)) -abi3t
+python_abi3t.cpptest: swig_and_compile_cpp = $(call swig_and_compile_cpp_helper,python_abi3t,'$(SWIGOPT)' PY_ABI_VER= PY_ABI3T=3.15)
 # Same as python_abi3t.cpptest above, but also passes -nogil to exercise -abi3t's
 # independent, explicit opt-in to declaring the module GIL-free.
-python_abi3t_nogil.cpptest: override SWIG_FEATURES := $(filter-out -builtin,$(SWIG_FEATURES))
-python_abi3t_nogil.cpptest: override SWIGOPT := $(filter-out -builtin,$(SWIGOPT)) -abi3t -nogil
-python_abi3t_nogil.cpptest: INCLUDES += -DPy_LIMITED_API=0x030f0000
+python_abi3t_nogil.cpptest: override SWIG_FEATURES := $(filter-out -builtin -O -fastproxy,$(SWIG_FEATURES))
+python_abi3t_nogil.cpptest: override SWIGOPT := $(filter-out -builtin -O -fastproxy,$(SWIGOPT)) -abi3t -nogil
+python_abi3t_nogil.cpptest: swig_and_compile_cpp = $(call swig_and_compile_cpp_helper,python_abi3t_nogil,'$(SWIGOPT)' PY_ABI_VER= PY_ABI3T=3.15)
 python_flatstaticmethod.cpptest: SWIGOPT += -flatstaticmethod
 python_nokwargs_keyword.cpptest: SWIGOPT += -keyword
 python_typehints.cpptest: SWIGOPT += -typehints

@@ -1301,11 +1301,20 @@ PYTHON_LINK   = @PY3LINK@
 
 # Set PY_ABI_VER to the target ABI version, such as 3.4, if wanting a stable ABI build
 PY_ABI_VER =
+# Set PY_ABI3T to the target free-threaded stable ABI version (PEP 803), 3.15 or
+# later, if wanting an abi3t build; takes precedence over PY_ABI_VER. The
+# resulting .abi3t module loads on both GIL-enabled and free-threaded Python.
+PY_ABI3T =
+ifneq (,$(PY_ABI3T))
+  PYTHON_SO      = .abi3t@PYTHON_SO@
+  EXTRA_CPPFLAGS := -DPy_TARGET_ABI3T=$(shell printf "0x%02X%02X0000" $(subst ., ,$(PY_ABI3T)))
+else
 ifneq (,$(PY_ABI_VER))
   PYTHON_SO      = .abi3@PYTHON_SO@
   EXTRA_CPPFLAGS := -DPy_LIMITED_API=$(shell printf "0x%02X%02X0000" $(subst ., ,$(PY_ABI_VER)))
 else
   PYTHON_SO      = @PYTHON_SO@
+endif
 endif
 
 PYFLAGS           = -Werror
