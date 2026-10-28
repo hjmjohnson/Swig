@@ -252,6 +252,11 @@ jobs:
           VER: '3.15'
           SWIG_FEATURES: -builtin
           continue-on-error: true
+        - SWIGLANG: python
+          VER: '3.15t'
+          CSTD: gnu99
+          SWIG_FEATURES: -nogil
+          continue-on-error: true
         - SWIGLANG: r
           os: ubuntu-24.04
         - SWIGLANG: ruby
