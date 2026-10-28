@@ -261,7 +261,7 @@ SWIGRUNTIME PyTypeObject* SwigVarLink_Type(void);
 /* Under abi3t, PyObject is opaque, so swig_varlinkobject cannot embed PyObject_HEAD
  * and a PyObject* cannot be reinterpreted as a swig_varlinkobject* by a direct cast;
  * PyObject_GetTypeData() (PEP 697) must be used to locate its per-instance data. */
-#define SWIG_AS_VARLINKOBJECT(obj) ((swig_varlinkobject *)PyObject_GetTypeData((PyObject *)(obj), SwigVarLink_Type()))
+#define SWIG_AS_VARLINKOBJECT(obj) ((swig_varlinkobject *)PyObject_GetTypeData((PyObject *)(obj), Py_TYPE((PyObject *)(obj))))
 #else
 #define SWIG_AS_VARLINKOBJECT(obj) ((swig_varlinkobject *)(obj))
 #endif
@@ -638,8 +638,12 @@ SWIGRUNTIME PyTypeObject* SwigPyObject_Type(void);
 #ifdef SWIGPYTHON_ABI3T
 /* Under abi3t, PyObject is opaque, so SwigPyObject cannot embed PyObject_HEAD and a
  * PyObject* cannot be reinterpreted as a SwigPyObject* by a direct cast;
- * PyObject_GetTypeData() (PEP 697) must be used to locate its per-instance data. */
-#define SWIG_AS_SWIGPYOBJECT(obj) ((SwigPyObject *)PyObject_GetTypeData((PyObject *)(obj), SwigPyObject_Type()))
+ * PyObject_GetTypeData() (PEP 697) must be used to locate its per-instance data.
+ * The object's own type is passed rather than this module's SwigPyObject_Type():
+ * each SWIG module creates its own SwigPyObject type and SwigPyObject_Check()
+ * accepts another module's instances by name, which are not instances of this
+ * module's type (an assertion failure in debug builds of CPython). */
+#define SWIG_AS_SWIGPYOBJECT(obj) ((SwigPyObject *)PyObject_GetTypeData((PyObject *)(obj), Py_TYPE((PyObject *)(obj))))
 #else
 #define SWIG_AS_SWIGPYOBJECT(obj) ((SwigPyObject *)(obj))
 #endif
@@ -1154,8 +1158,9 @@ SWIGRUNTIME PyTypeObject* SwigPyPacked_Type(void);
 #ifdef SWIGPYTHON_ABI3T
 /* Under abi3t, PyObject is opaque, so SwigPyPacked cannot embed PyObject_HEAD and a
  * PyObject* cannot be reinterpreted as a SwigPyPacked* by a direct cast;
- * PyObject_GetTypeData() (PEP 697) must be used to locate its per-instance data. */
-#define SWIG_AS_SWIGPYPACKED(obj) ((SwigPyPacked *)PyObject_GetTypeData((PyObject *)(obj), SwigPyPacked_Type()))
+ * PyObject_GetTypeData() (PEP 697) must be used to locate its per-instance data,
+ * with the object's own type (see SWIG_AS_SWIGPYOBJECT). */
+#define SWIG_AS_SWIGPYPACKED(obj) ((SwigPyPacked *)PyObject_GetTypeData((PyObject *)(obj), Py_TYPE((PyObject *)(obj))))
 #else
 #define SWIG_AS_SWIGPYPACKED(obj) ((SwigPyPacked *)(obj))
 #endif
