@@ -189,17 +189,13 @@ SWIGINTERN int SWIG_mod_exec(PyObject *module);
 
 #ifdef SWIGPYTHON_ABI3T
 
-/* Under abi3t, PyObject is opaque (_Py_OPAQUE_PYOBJECT), so PyModuleDef_Base and
- * PyModuleDef (which embed PyObject_HEAD) are not declared, and neither is
- * PyModuleDef_Init()/PyInit_<name>(). The replacement, new in Python 3.15 (PEP 803),
- * is a PyModExport_<name>() entry point that returns a PySlot[] array directly;
- * the loader builds the module object itself via PyModule_FromSlotsAndSpec()/
- * PyModule_Exec(), so this function only has to describe the module, not build it.
+/* Under abi3t, PyObject is opaque, so PyModuleDef and PyInit_<name>() are
+ * unavailable; the module is described by a PyModExport_<name>() entry point
+ * returning a PySlot[] array (PEP 803, Python 3.15).
  *
- * PyABIInfo_VAR() declares a plain static (internal-linkage) variable, so it must
- * not be placed under the extern "C" below (which applies to a single declaration
- * only, and a static variable cannot have "C" linkage). */
-PyABIInfo_VAR(SWIG_module_abiinfo)
+ * PyABIInfo_VAR() declares a static variable, so it must not be placed under
+ * the extern "C" below. */
+PyABIInfo_VAR(SWIG_module_abiinfo);
 
 #ifdef __cplusplus
 extern "C"
@@ -207,29 +203,25 @@ extern "C"
 SWIGEXPORT
 PySlot *
 SWIG_init_export(void) {
-
-  /* CPython's PySlot_FUNC/PySlot_DATA/PySlot_STATIC_DATA macros (moduleobject.h)
-   * leave the PySlot::sl_flags member and an anonymous union member to implicit
-   * zero-initialization, which -Wmissing-field-initializers flags under -Werror. */
+  /* PySlot_PTR/PySlot_PTR_STATIC rather than PySlot_FUNC/PySlot_DATA/
+   * PySlot_STATIC_DATA, which use designated initializers (C99/C++20).
+   * PySlot_END is {0} in CPython 3.15.0, which -Wmissing-field-initializers
+   * flags under -Werror in C++. */
 #ifdef __GNUC__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 #endif
   static struct PySlot SwigSlots[] = {
-    PySlot_FUNC(Py_mod_exec, SWIG_mod_exec),
-    PySlot_DATA(Py_mod_abi, &SWIG_module_abiinfo),
+    PySlot_PTR(Py_mod_exec, SWIG_mod_exec),
+    PySlot_PTR(Py_mod_abi, &SWIG_module_abiinfo),
 #ifdef SWIGPYTHON_NOGIL
-    /* Py_MOD_GIL_NOT_USED is declared unconditionally for Py_LIMITED_API >= 3.13
-     * (unlike PyUnstable_Module_SetGIL, which Py_LIMITED_API excludes entirely), so
-     * unlike the multi-phase init path above this does not need to also be guarded
-     * by Py_GIL_DISABLED: an abi3t build is compiled once and loaded by both GIL
-     * and free-threaded interpreters, so it cannot rely on the build environment's
-     * own GIL configuration to decide what to declare here. */
-    PySlot_DATA(Py_mod_gil, Py_MOD_GIL_NOT_USED),
+    /* Py_MOD_GIL_NOT_USED is available for Py_LIMITED_API >= 3.13 regardless of
+     * Py_GIL_DISABLED; an abi3t build is loaded by both GIL and free-threaded
+     * interpreters so it cannot depend on the build environment's GIL mode. */
+    PySlot_PTR(Py_mod_gil, Py_MOD_GIL_NOT_USED),
 #endif
-    /* Unlike PyModuleDef.m_methods, PyModExport's slots do not implicitly add
-     * the methods to the module; Py_mod_methods must be supplied explicitly. */
-    PySlot_STATIC_DATA(Py_mod_methods, SwigMethods),
+    /* Unlike PyModuleDef.m_methods, Py_mod_methods must be supplied explicitly. */
+    PySlot_PTR_STATIC(Py_mod_methods, SwigMethods),
     PySlot_END
   };
 #ifdef __GNUC__
