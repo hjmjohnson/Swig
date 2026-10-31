@@ -261,7 +261,7 @@ SWIGRUNTIME PyTypeObject* SwigVarLink_Type(void);
 /* Under abi3t, PyObject is opaque, so swig_varlinkobject cannot embed PyObject_HEAD
  * and a PyObject* cannot be reinterpreted as a swig_varlinkobject* by a direct cast;
  * PyObject_GetTypeData() (PEP 697) must be used to locate its per-instance data. */
-#define SWIG_AS_VARLINKOBJECT(obj) ((swig_varlinkobject *)PyObject_GetTypeData((PyObject *)(obj), SwigVarLink_Type()))
+#define SWIG_AS_VARLINKOBJECT(obj) ((swig_varlinkobject *)PyObject_GetTypeData((PyObject *)(obj), Py_TYPE((PyObject *)(obj))))
 #else
 #define SWIG_AS_VARLINKOBJECT(obj) ((swig_varlinkobject *)(obj))
 #endif
@@ -638,8 +638,12 @@ SWIGRUNTIME PyTypeObject* SwigPyObject_Type(void);
 #ifdef SWIGPYTHON_ABI3T
 /* Under abi3t, PyObject is opaque, so SwigPyObject cannot embed PyObject_HEAD and a
  * PyObject* cannot be reinterpreted as a SwigPyObject* by a direct cast;
- * PyObject_GetTypeData() (PEP 697) must be used to locate its per-instance data. */
-#define SWIG_AS_SWIGPYOBJECT(obj) ((SwigPyObject *)PyObject_GetTypeData((PyObject *)(obj), SwigPyObject_Type()))
+ * PyObject_GetTypeData() (PEP 697) must be used to locate its per-instance data.
+ * The object's own type is passed rather than this module's SwigPyObject_Type():
+ * each SWIG module creates its own SwigPyObject type and SwigPyObject_Check()
+ * accepts another module's instances by name, which are not instances of this
+ * module's type (an assertion failure in debug builds of CPython). */
+#define SWIG_AS_SWIGPYOBJECT(obj) ((SwigPyObject *)PyObject_GetTypeData((PyObject *)(obj), Py_TYPE((PyObject *)(obj))))
 #else
 #define SWIG_AS_SWIGPYOBJECT(obj) ((SwigPyObject *)(obj))
 #endif
@@ -668,12 +672,12 @@ SwigPyObject_long(PyObject *v)
 }
 
 SWIGRUNTIME PyObject *
-SwigPyObject_format(const char* fmt, SwigPyObject *v)
+SwigPyObject_format(const char* fmt, PyObject *v)
 {
   PyObject *res = NULL;
   PyObject *args = PyTuple_New(1);
   if (args) {
-    PyObject *val = SwigPyObject_long((PyObject *)v);
+    PyObject *val = SwigPyObject_long(v);
     if (val) {
       PyObject *ofmt;
       PyTuple_SET_ITEM(args, 0, val);
@@ -689,13 +693,13 @@ SwigPyObject_format(const char* fmt, SwigPyObject *v)
 }
 
 SWIGRUNTIME PyObject *
-SwigPyObject_oct(SwigPyObject *v)
+SwigPyObject_oct(PyObject *v)
 {
   return SwigPyObject_format("%o",v);
 }
 
 SWIGRUNTIME PyObject *
-SwigPyObject_hex(SwigPyObject *v)
+SwigPyObject_hex(PyObject *v)
 {
   return SwigPyObject_format("%x",v);
 }
@@ -1154,8 +1158,9 @@ SWIGRUNTIME PyTypeObject* SwigPyPacked_Type(void);
 #ifdef SWIGPYTHON_ABI3T
 /* Under abi3t, PyObject is opaque, so SwigPyPacked cannot embed PyObject_HEAD and a
  * PyObject* cannot be reinterpreted as a SwigPyPacked* by a direct cast;
- * PyObject_GetTypeData() (PEP 697) must be used to locate its per-instance data. */
-#define SWIG_AS_SWIGPYPACKED(obj) ((SwigPyPacked *)PyObject_GetTypeData((PyObject *)(obj), SwigPyPacked_Type()))
+ * PyObject_GetTypeData() (PEP 697) must be used to locate its per-instance data,
+ * with the object's own type (see SWIG_AS_SWIGPYOBJECT). */
+#define SWIG_AS_SWIGPYPACKED(obj) ((SwigPyPacked *)PyObject_GetTypeData((PyObject *)(obj), Py_TYPE((PyObject *)(obj))))
 #else
 #define SWIG_AS_SWIGPYPACKED(obj) ((SwigPyPacked *)(obj))
 #endif
@@ -1401,14 +1406,14 @@ SWIG_This(void)
   return Swig_This_global;
 }
 
-/* Returns a borrowed reference to the 'this' object */
-SWIGRUNTIME SwigPyObject *
-SWIG_Python_GetSwigThis(PyObject *pyobj) 
+/* Returns a borrowed reference to the 'this' SwigPyObject instance, or NULL */
+SWIGRUNTIME PyObject *
+SWIG_Python_GetSwigThisObject(PyObject *pyobj)
 {
   PyObject *obj;
 
   if (SwigPyObject_Check(pyobj))
-    return SWIG_AS_SWIGPYOBJECT(pyobj);
+    return pyobj;
 
 #ifdef SWIGPYTHON_BUILTIN
   (void)obj;
@@ -1422,7 +1427,7 @@ SWIG_Python_GetSwigThis(PyObject *pyobj)
     pyobj = PyWeakref_GetObject(pyobj);
 #endif
     if (pyobj && SwigPyObject_Check(pyobj))
-      return SWIG_AS_SWIGPYOBJECT(pyobj);
+      return pyobj;
   }
   return NULL;
 #else
@@ -1439,10 +1444,18 @@ SWIG_Python_GetSwigThis(PyObject *pyobj)
   if (obj && !SwigPyObject_Check(obj)) {
     /* a PyObject is called 'this', try to get the 'real this'
        SwigPyObject from it */ 
-    return SWIG_Python_GetSwigThis(obj);
+    return SWIG_Python_GetSwigThisObject(obj);
   }
-  return SWIG_AS_SWIGPYOBJECT(obj);
+  return obj;
 #endif
+}
+
+/* Returns the data of the 'this' SwigPyObject instance, or NULL */
+SWIGRUNTIME SwigPyObject *
+SWIG_Python_GetSwigThis(PyObject *pyobj)
+{
+  PyObject *obj = SWIG_Python_GetSwigThisObject(pyobj);
+  return obj ? SWIG_AS_SWIGPYOBJECT(obj) : NULL;
 }
 
 /* Acquire a pointer value */
@@ -1691,9 +1704,9 @@ SWIG_Python_InitShadowInstance(PyObject *args) {
   if (!SWIG_Python_UnpackTuple(args, "swiginit", 2, 2, obj)) {
     return NULL;
   } else {
-    SwigPyObject *sthis = SWIG_Python_GetSwigThis(obj[0]);
+    PyObject *sthis = SWIG_Python_GetSwigThisObject(obj[0]);
     if (sthis) {
-      SWIG_Py_DECREF(SwigPyObject_append((PyObject*) sthis, obj[1]));
+      SWIG_Py_DECREF(SwigPyObject_append(sthis, obj[1]));
     } else {
       if (SWIG_Python_SetSwigThis(obj[0], obj[1]) != 0)
         return NULL;

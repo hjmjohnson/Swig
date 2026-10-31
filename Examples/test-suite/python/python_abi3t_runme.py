@@ -1,6 +1,12 @@
-from python_abi3t import *
 import sys
 import sysconfig
+import warnings
+
+# A module that does not declare itself GIL-free re-enables the GIL when imported
+# into a free-threaded interpreter, with a RuntimeWarning that -Werror makes fatal.
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", RuntimeWarning)
+    from python_abi3t import *
 
 f = Abi3tFoo(42)
 if f.value != 42:
